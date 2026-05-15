@@ -656,9 +656,10 @@ query_suite() {
     # Suite to install - bionic focal jammy noble
     if [[ ! -v SUITE ]] ; then
         SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro" 15 42 8 \
+			resolute "26.04 Resolute Raccoon" ON \
             questing "25.10 Questing Quokka" OFF \
             plucky "25.04 Plucky Puffin" OFF \
-            noble "24.04 Noble Numbat" ON \
+            noble "24.04 Noble Numbat" OFF \
             jammy "22.04 Jammy Jellyfish" OFF \
             focal "20.04 Focal Fossa" OFF \
             bionic "18.04 Bionic Beaver" OFF \
@@ -671,6 +672,20 @@ query_suite() {
     # TODO: Make use of SUITE_EXTRAS maybe
     #
     case ${SUITE} in
+		resolute)
+            SUITE_NUM="26.04"
+            SUITE_EXTRAS="netplan.io expect"
+            SUITE_BOOTSTRAP="wget,whois,rsync,gdisk,netplan.io,gpg-agent"
+            # Install HWE packages - set to blank or to "-hwe-25.04"
+            # Gets tacked on to various packages below
+            # TODO: No HWE packages for 25.04 yet - use this when/if available
+            # [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
+            HWE=
+            # Specific zpool features available in jammy
+            SUITE_ROOT_POOL="-O dnodesize=auto"
+            # Ensure we have the questing/25.10 signing key in place
+            wget -qO - https://archive.ubuntu.com/ubuntu/dists/resolute/InRelease | sudo gpg --dearmor -o /etc/apt/keyrings/resolute_keyring.gpg
+            ;;
         questing)
             SUITE_NUM="25.10"
             SUITE_EXTRAS="netplan.io expect"
@@ -1285,7 +1300,11 @@ create_zfs_datasets() {
 
     # If this system will use Docker (which manages its own datasets & snapshots):
     zfs create -o com.sun:auto-snapshot=false -o mountpoint=/var/lib/docker ${POOLNAME}/docker
-
+	
+	# Additional volumes
+	zfs create  -o canmount=on -o mountpoint=/containerdata ${POOLNAME}/containerdata
+	zfs create  -o canmount=on -o mountpoint=/certificates ${POOLNAME}/certificates
+	
     # If no HIBERNATE partition (not laptop, no resume etc) then just create
     # a zvol for swap.  Could not create this in the block above for swap because
     # the root pool didn't exist yet.
@@ -1673,7 +1692,12 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
     # efi-shell-x64 (shellx64.efi) only from noble/24.04 on
     case ${SUITE} in
-        questing)
+   		resolute)
+            SUITE_NUM="26.04"
+            SUITE_BSDUTILS="bsdextrautils"
+            EFI_SHELL="efi-shell-x64"
+            ;;     
+		questing)
             SUITE_NUM="25.10"
             SUITE_BSDUTILS="bsdextrautils"
             EFI_SHELL="efi-shell-x64"
