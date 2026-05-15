@@ -1735,37 +1735,6 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     apt-get --yes update
     apt-get -qq --yes --no-install-recommends install software-properties-common debconf-utils mdadm
 
-    # Preseed a few things
-    # NOTE: tabs as first char to handle indented heredoc
-    cat > /tmp/selections <<- EOFPRE
-		# zfs-dkms license notification
-		zfs-dkms        zfs-dkms/note-incompatible-licenses  note
-		# tzdata
-		tzdata  tzdata/Zones/US                         select Eastern
-		tzdata  tzdata/Zones/America                    select Denver
-		tzdata  tzdata/Areas                            select America
-		console-setup   console-setup/codeset47         select  # Latin1 and Latin5 - western Europe and Turkic languages
-	EOFPRE
-    cat /tmp/selections | debconf-set-selections
-
-    # Set up locale - must set langlocale variable (defaults to en_US)
-    # NOTE: tabs as first char to handle indented heredoc
-    cat > /etc/default/locale <<- EOFLOCALE
-	 	# LC_ALL=en_US.UTF-8
-	 	LANG=en_US.UTF-8
-	 	LANGUAGE=en_US:en
-	EOFLOCALE
-    cat > /etc/locale.gen <<- EOFLOCALEGEN
-		en_US.UTF-8 UTF-8
-	EOFLOCALEGEN
-    cat /etc/default/locale >> /etc/environment
-    locale-gen --purge "en_US.UTF-8"
-    dpkg-reconfigure -f noninteractive locales
-
-    echo "America/Boise" > /etc/timezone
-    ln -fs /usr/share/zoneinfo/US/Mountain /etc/localtime
-    dpkg-reconfigure -f noninteractive tzdata
-
     # NOTE: Very important
     #       Do NOT install initramfs-tools next to dracut
     #       They wrestle and knock each other out
