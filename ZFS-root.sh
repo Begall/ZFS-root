@@ -656,10 +656,10 @@ query_suite() {
     # Suite to install - bionic focal jammy noble
     if [[ ! -v SUITE ]] ; then
         SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro" 15 42 8 \
-			resolute "26.04 Resolute Raccoon" ON \
+			resolute "26.04 Resolute Raccoon" OFF \
             questing "25.10 Questing Quokka" OFF \
             plucky "25.04 Plucky Puffin" OFF \
-            noble "24.04 Noble Numbat" OFF \
+            noble "24.04 Noble Numbat" ON \
             jammy "22.04 Jammy Jellyfish" OFF \
             focal "20.04 Focal Fossa" OFF \
             bionic "18.04 Bionic Beaver" OFF \
@@ -1085,7 +1085,7 @@ partition_disks() {
 
         # Legacy (BIOS) booting
         sgdisk -a 1                                     /dev/disk/by-id/${zfsdisks[${disk}]}     # Set sector alignment to 1MiB
-        sgdisk -n ${PARTITION_BOOT}:1M:+1000M           /dev/disk/by-id/${zfsdisks[${disk}]}     # Create partition 1/BOOT 1M size
+        sgdisk -n ${PARTITION_BOOT}:1M:+2000M           /dev/disk/by-id/${zfsdisks[${disk}]}     # Create partition 1/BOOT 1M size
         sgdisk -A ${PARTITION_BOOT}:set:2               /dev/disk/by-id/${zfsdisks[${disk}]}     # Turn legacy boot attribute on
         sgdisk -c ${PARTITION_BOOT}:"BOOT_EFI_${disk}"  /dev/disk/by-id/${zfsdisks[${disk}]}     # Set partition name to BOOT_EFI_n
         sgdisk -t ${PARTITION_BOOT}:EF00                /dev/disk/by-id/${zfsdisks[${disk}]}     # Set partition type to EFI
@@ -3142,6 +3142,31 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			      - type: regex
 			        negate: true
 			        regex: "^zrepl_.*"
+
+			  - name: snapcontainers
+			    type: snap
+			    filesystems: {
+			        "${POOLNAME}/containerdata<": true,
+			    }
+			    # create snapshots with prefix 'zrepl_' every 15 minutes
+			    snapshotting:
+			      type: periodic
+			      interval: 15m
+			      timestamp_format: human
+			      prefix: zrepl_
+			    pruning:
+			      keep:
+			      - type: grid
+			        grid: 1x1h(keep=all) | 24x1h | 30x1d
+			        regex: "^zrepl_.*"
+			      # keep all base or desktop installs
+			      - type: regex
+			        regex: "^(base_install|desktop_install)"
+			      # keep all snapshots that don't have the 'zrepl_' or 'apt_' prefix
+			      # Note: apt snapshots are governed by the apt last_n policy above
+			      - type: regex
+			        negate: true
+			        regex: "^zrepl_.*"					
 		EOF
 
         # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
@@ -3228,7 +3253,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     if [ "${GNOME}" = "y" ] ; then
         # NOTE: bionic has an xserver-xorg-hwe-<distro> package, focal and above do NOT
         case ${SUITE} in
-            focal | jammy | noble | plucky | questing)
+            focal | jammy | noble | plucky | questing | resolute)
                 # Don't install kdump-tools
                 cat > /tmp/kdump-selections <<- EOF
 					# Should kdump-tools be enabled by default?
@@ -3481,7 +3506,7 @@ fi
 # Query for install options
 query_install_options
 # zrepl has no release for 25.04/plucky or 25.10/questing yet
-[ "${SUITE}" == "plucky" ] || [ "${SUITE}" == "questing" ] && ZREPL=n
+[ "${SUITE}" == "plucky" ] || [ "${SUITE}" == "questing" ] ||  "${SUITE}" == "resolute" ] && ZREPL=n
 
 query_nvidia
 query_google_auth
